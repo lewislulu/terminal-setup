@@ -22,10 +22,12 @@ One-script terminal environment setup for **macOS**, **Debian/Ubuntu**, and **Wi
 
 | Platform | Status | Package Manager |
 |----------|--------|----------------|
-| 🍎 **macOS** | ✅ Full support | Homebrew |
-| 🐧 **Debian / Ubuntu** | ✅ Full support | apt + GitHub releases |
-| 🪟 **Windows (WSL)** | ✅ Full support | apt (inside WSL) |
+| 🍎 **macOS** | ✅ Primary — battle-tested | Homebrew |
+| 🐧 **Debian / Ubuntu** | 🧪 Experimental — works but not extensively tested | apt + bundled binaries |
+| 🪟 **Windows (WSL)** | 🧪 Experimental — works but not extensively tested | apt (inside WSL) |
 | 🪟 **Windows (native)** | ⛔ Not supported | Use WSL instead |
+
+> **Note:** This script is primarily developed and tested on macOS. Linux (Debian/Ubuntu) and WSL support has been added and works, but has not gone through long-term usage testing. Issues and PRs welcome!
 
 ## Quick Start
 

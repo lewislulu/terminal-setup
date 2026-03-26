@@ -22,9 +22,11 @@
 
 | 平台 | 状态 | 包管理器 |
 |------|------|---------|
-| 🍎 **macOS** | ✅ 完整支持 | Homebrew |
-| 🐧 **Debian / Ubuntu** | ✅ 完整支持 | apt + GitHub releases |
-| 🪟 **Windows (WSL)** | ✅ 完整支持 | apt（WSL 内部） |
+| 🍎 **macOS** | ✅ 主力平台 — 长期使用验证 | Homebrew |
+| 🐧 **Debian / Ubuntu** | 🧪 实验性 — 可用但未经长期测试 | apt + 内置二进制 |
+| 🪟 **Windows (WSL)** | 🧪 实验性 — 可用但未经长期测试 | apt（WSL 内部） |
+
+> **注意：** 本脚本主要在 macOS 上开发和测试。Linux（Debian/Ubuntu）和 WSL 支持已添加且可用，但尚未经过长期使用测试。欢迎提 Issue 和 PR！
 | 🪟 **Windows (原生)** | ⛔ 不支持 | 请先安装 WSL |
 
 ## 快速开始
