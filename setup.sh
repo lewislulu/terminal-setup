@@ -623,8 +623,13 @@ else
             run_cmd brew install starship
             ;;
         debian|wsl)
-            info "Installing Starship via official installer..."
-            run_cmd sh -c "$(curl -fsSL https://starship.rs/install.sh)" -- --yes
+            info "Installing Starship..."
+            if [[ -f "$SCRIPT_DIR/bin/linux-x86_64/starship" ]]; then
+                run_cmd sudo cp "$SCRIPT_DIR/bin/linux-x86_64/starship" /usr/local/bin/starship
+                run_cmd sudo chmod +x /usr/local/bin/starship
+            else
+                run_cmd sh -c "$(curl -fsSL https://starship.rs/install.sh)" -- --yes
+            fi
             ;;
     esac
     success "Starship installed"
