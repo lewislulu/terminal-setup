@@ -477,7 +477,7 @@ install_cli_tools_macos() {
 
 install_cli_tools_linux() {
     # Tools available directly from apt (on modern Debian/Ubuntu)
-    local APT_TOOLS=(bat fd-find ripgrep zoxide jq fzf)
+    local APT_TOOLS=(bat fd-find ripgrep jq fzf)
 
     for tool in "${APT_TOOLS[@]}"; do
         if dpkg -s "$tool" &>/dev/null 2>&1; then
@@ -502,6 +502,20 @@ install_cli_tools_linux() {
             success "btop installed via snap"
         else
             warn "btop not available via apt or snap — skipping (install manually: https://github.com/aristocratos/btop)"
+        fi
+    fi
+
+    # zoxide — not in apt on older Debian/Ubuntu, use curl installer as fallback
+    if has_cmd zoxide; then
+        success "zoxide already installed"
+    else
+        info "Installing zoxide..."
+        if run_cmd sudo apt-get install -y zoxide 2>/dev/null; then
+            success "zoxide installed via apt"
+        else
+            info "zoxide not in apt, installing via curl..."
+            run_cmd curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
+            success "zoxide installed via curl"
         fi
     fi
 
