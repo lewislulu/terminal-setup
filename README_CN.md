@@ -64,6 +64,8 @@ cd terminal-setup && ./setup.sh
 ```bash
 ./setup.sh --fish       # Fish shell
 ./setup.sh --zsh        # Zsh + 类 Fish 插件
+./setup.sh --ghostty    # Ghostty 终端 (macOS)
+./setup.sh --cmux       # cmux 终端 (macOS，基于 Ghostty)
 ./setup.sh --dry-run    # 预览会做什么（不做任何改动）
 ```
 
@@ -84,11 +86,20 @@ bash <(curl -fsSL https://raw.githubusercontent.com/lewislulu/terminal-setup/mai
 | **配置文件** | `~/.config/fish/config.fish` | `~/.zshrc` |
 | **适合** | 开箱即用，省心 | 写脚本，POSIX 兼容 |
 
+## 选择你的终端
+
+| | 👻 Ghostty | 🔧 cmux |
+|---|-----------|---------|
+| **平台** | macOS、Linux、WSL | macOS（Linux 即将支持） |
+| **特性** | 快速、GPU 加速、配置简洁 | 基于 Ghostty + 垂直标签、分屏、通知 |
+| **配置** | `~/.config/ghostty/config` | 使用 Ghostty 配置 |
+| **适合** | 极简、快速启动 | Agent 工作流、多任务处理 |
+
 ## 工具栈
 
 | 组件 | 说明 |
 |------|------|
-| **[Ghostty](https://ghostty.org)** | GPU 加速终端模拟器 |
+| **Ghostty** 或 **cmux** | 终端模拟器（任选） |
 | **Fish** 或 **Zsh** | Shell（你选） |
 | **[Starship](https://starship.rs)** | 跨 Shell 提示符（Catppuccin Mocha 主题） |
 | **MesloLGS NF** | Nerd Font，提供图标和 Powerline 字形 |
