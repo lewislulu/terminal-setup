@@ -10,9 +10,11 @@
 # Theme: Catppuccin Mocha (Starship)
 #
 # Usage:
-#   ./setup.sh              # interactive shell choice
+#   ./setup.sh              # interactive shell and terminal choice
 #   ./setup.sh --fish       # use Fish
 #   ./setup.sh --zsh        # use Zsh (with fish-like plugins)
+#   ./setup.sh --ghostty    # use Ghostty terminal
+#   ./setup.sh --cmux       # use cmux terminal
 #   ./setup.sh --dry-run    # preview what would be done (no changes)
 #
 
@@ -45,10 +47,13 @@ run_cmd() {
 
 # ─── Parse Arguments ────────────────────────────────────────────────
 SHELL_CHOICE=""
+TERMINAL_CHOICE=""
 for arg in "$@"; do
     case "$arg" in
         --fish)    SHELL_CHOICE="fish" ;;
         --zsh)     SHELL_CHOICE="zsh" ;;
+        --ghostty) TERMINAL_CHOICE="ghostty" ;;
+        --cmux)    TERMINAL_CHOICE="cmux" ;;
         --dry-run) DRY_RUN=true ;;
     esac
 done
@@ -128,6 +133,27 @@ fi
 
 echo ""
 info "Setting up with ${BOLD}${SHELL_CHOICE}${NC} on ${BOLD}${OS}${NC}"
+
+# ─── Terminal Emulator Choice ────────────────────────────────────────
+if [[ -z "$TERMINAL_CHOICE" ]]; then
+    echo ""
+    echo -e "${BOLD}Which terminal emulator do you want to use?${NC}"
+    echo ""
+    echo -e "  ${GREEN}1)${NC} ${BOLD}Ghostty${NC} — Fast, GPU-accelerated terminal (macOS native)"
+    echo -e "  ${GREEN}2)${NC} ${BOLD}cmux${NC}    — Built on Ghostty, vertical tabs, notifications, split panes"
+    echo ""
+    while true; do
+        read -rp "Choose [1/2]: " choice
+        case "$choice" in
+            1|ghostty) TERMINAL_CHOICE="ghostty"; break ;;
+            2|cmux)    TERMINAL_CHOICE="cmux"; break ;;
+            *) echo "Please enter 1 or 2." ;;
+        esac
+    done
+fi
+
+echo ""
+info "Using terminal: ${BOLD}${TERMINAL_CHOICE}${NC}"
 
 # ─── Config Directory ───────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -229,32 +255,51 @@ echo -e "${BOLD}═════════════════════�
 
 case "$OS" in
     macos)
-        if [[ ! -d "/Applications/Ghostty.app" ]]; then
-            info "Installing Ghostty..."
-            run_cmd brew install --cask ghostty
-            success "Ghostty installed"
-        else
-            success "Ghostty already installed"
+        if [[ "$TERMINAL_CHOICE" == "ghostty" ]]; then
+            if [[ ! -d "/Applications/Ghostty.app" ]]; then
+                info "Installing Ghostty..."
+                run_cmd brew install --cask ghostty
+                success "Ghostty installed"
+            else
+                success "Ghostty already installed"
+            fi
+        elif [[ "$TERMINAL_CHOICE" == "cmux" ]]; then
+            if [[ ! -d "/Applications/cmux.app" ]]; then
+                info "Installing cmux..."
+                run_cmd brew install --cask cmux
+                success "cmux installed"
+            else
+                success "cmux already installed"
+            fi
         fi
         ;;
     debian)
-        # Ghostty on Linux: check if already installed, otherwise try snap/flatpak or skip
-        if has_cmd ghostty; then
-            success "Ghostty already installed"
-        else
-            warn "Ghostty is not easily available on Linux via apt."
-            echo -e "  Options to install Ghostty on Linux:"
-            echo -e "    • Snap:    ${BOLD}sudo snap install ghostty${NC}"
-            echo -e "    • Build:   ${BOLD}https://ghostty.org/docs/install/build${NC}"
-            echo -e "    • Or use any other terminal (kitty, alacritty, etc.)"
-            echo ""
-            info "Skipping Ghostty installation — install it manually if desired."
+        if [[ "$TERMINAL_CHOICE" == "ghostty" ]]; then
+            if has_cmd ghostty; then
+                success "Ghostty already installed"
+            else
+                warn "Ghostty is not easily available on Linux via apt."
+                echo -e "  Options to install Ghostty on Linux:"
+                echo -e "    • Snap:    ${BOLD}sudo snap install ghostty${NC}"
+                echo -e "    • Build:   ${BOLD}https://ghostty.org/docs/install/build${NC}"
+                echo -e "    • Or use any other terminal (kitty, alacritty, etc.)"
+                echo ""
+                info "Skipping Ghostty installation — install it manually if desired."
+            fi
+        elif [[ "$TERMINAL_CHOICE" == "cmux" ]]; then
+            warn "cmux is macOS-only at this time."
+            echo -e "  For Linux, please use Ghostty or another terminal."
+            info "Skipping cmux installation."
         fi
         ;;
     wsl)
         info "WSL detected — terminal emulator runs on the Windows side."
-        echo -e "  Install Ghostty for Windows: ${BOLD}https://ghostty.org${NC}"
-        echo -e "  Or use Windows Terminal, which works great with WSL."
+        if [[ "$TERMINAL_CHOICE" == "cmux" ]]; then
+            echo -e "  cmux is macOS-only. For WSL, please use Windows Terminal or Ghostty for Windows."
+        else
+            echo -e "  Install Ghostty for Windows: ${BOLD}https://ghostty.org${NC}"
+            echo -e "  Or use Windows Terminal, which works great with WSL."
+        fi
         info "Skipping terminal emulator installation."
         ;;
 esac
@@ -742,108 +787,205 @@ success "Starship config deployed"
 
 # --- Shell-specific config ---
 if [[ "$SHELL_CHOICE" == "fish" ]]; then
-    # Fish config
     FISH_CONFIG_DIR="$HOME/.config/fish"
     mkdir -p "$FISH_CONFIG_DIR"
+    FISH_CONFIG="$FISH_CONFIG_DIR/config.fish"
 
-    if [[ -f "$FISH_CONFIG_DIR/config.fish" ]]; then
-        run_cmd cp "$FISH_CONFIG_DIR/config.fish" "$FISH_CONFIG_DIR/config.fish.bak.$(date +%s)"
+    if [[ -f "$FISH_CONFIG" ]]; then
+        info "Smart merging: preserving existing config.fish..."
+        run_cmd cp "$FISH_CONFIG" "$FISH_CONFIG_DIR/config.fish.bak.$(date +%s)"
         warn "Backed up existing config.fish"
     fi
 
-    # Deploy platform-appropriate fish config
-    if [[ "$OS" == "macos" ]]; then
-        run_cmd cp "$CONFIGS_DIR/config.fish" "$FISH_CONFIG_DIR/config.fish"
+    if [[ ! -f "$FISH_CONFIG" ]] || [[ ! -s "$FISH_CONFIG" ]]; then
+        if [[ "$OS" == "macos" ]]; then
+            run_cmd cp "$CONFIGS_DIR/config.fish" "$FISH_CONFIG"
+        else
+            run_cmd cp "$CONFIGS_DIR/config.fish" "$FISH_CONFIG"
+            sed -i 's|/opt/homebrew/bin/starship|starship|g' "$FISH_CONFIG"
+            sed -i 's|fish_add_path /opt/homebrew/bin|# PATH: system paths are used on Linux|g' "$FISH_CONFIG"
+            sed -i 's|\$HOME/Library/pnpm|\$HOME/.local/share/pnpm|g' "$FISH_CONFIG"
+        fi
+        success "Fish config deployed"
     else
-        # For Linux: use modified config without Homebrew paths
-        run_cmd cp "$CONFIGS_DIR/config.fish" "$FISH_CONFIG_DIR/config.fish"
-        # Patch: replace Homebrew paths with Linux equivalents
-        sed -i 's|/opt/homebrew/bin/starship|starship|g' "$FISH_CONFIG_DIR/config.fish"
-        sed -i 's|fish_add_path /opt/homebrew/bin|# PATH: system paths are used on Linux|g' "$FISH_CONFIG_DIR/config.fish"
-        # Fix pnpm path for Linux
-        sed -i 's|\$HOME/Library/pnpm|\$HOME/.local/share/pnpm|g' "$FISH_CONFIG_DIR/config.fish"
-    fi
-    success "Fish config deployed"
+        if ! grep -qF "starship init fish" "$FISH_CONFIG" 2>/dev/null; then
+            info "Adding Starship init to fish config..."
+            echo '' >> "$FISH_CONFIG"
+            echo '# Starship prompt' >> "$FISH_CONFIG"
+            if [[ "$OS" == "macos" ]]; then
+                echo 'source (/opt/homebrew/bin/starship init fish --print-full-init | psub)' >> "$FISH_CONFIG"
+            else
+                echo 'source (starship init fish --print-full-init | psub)' >> "$FISH_CONFIG"
+            fi
+        fi
 
-    # Fish abbreviations
+        if ! grep -qF "fnm env" "$FISH_CONFIG" 2>/dev/null; then
+            info "Adding fnm init to fish config..."
+            echo '' >> "$FISH_CONFIG"
+            echo '# fnm (Node version manager)' >> "$FISH_CONFIG"
+            echo 'fnm env --use-on-cd --shell fish | source' >> "$FISH_CONFIG"
+        fi
+
+        if ! grep -qF "zoxide init fish" "$FISH_CONFIG" 2>/dev/null; then
+            info "Adding zoxide init to fish config..."
+            echo '' >> "$FISH_CONFIG"
+            echo '# zoxide' >> "$FISH_CONFIG"
+            echo 'zoxide init fish | source' >> "$FISH_CONFIG"
+        fi
+
+        if ! grep -qF "fzf --fish" "$FISH_CONFIG" 2>/dev/null; then
+            info "Adding fzf init to fish config..."
+            echo '' >> "$FISH_CONFIG"
+            echo '# fzf' >> "$FISH_CONFIG"
+            echo 'fzf --fish | source' >> "$FISH_CONFIG"
+            echo "set -gx FZF_DEFAULT_OPTS '--height 40% --layout=reverse --border'" >> "$FISH_CONFIG"
+            echo 'if command -q fd' >> "$FISH_CONFIG"
+            echo '    set -gx FZF_DEFAULT_COMMAND '\''fd --type f --hidden --follow --exclude .git'\''' >> "$FISH_CONFIG"
+            echo '    set -gx FZF_CTRL_T_COMMAND $FZF_DEFAULT_COMMAND' >> "$FISH_CONFIG"
+            echo '    set -gx FZF_ALT_C_COMMAND '\''fd --type d --hidden --follow --exclude .git'\''' >> "$FISH_CONFIG"
+            echo 'end' >> "$FISH_CONFIG"
+        fi
+
+        if [[ "$OS" == "debian" || "$OS" == "wsl" ]]; then
+            if ! grep -qF '.local/bin' "$FISH_CONFIG" 2>/dev/null; then
+                echo '' >> "$FISH_CONFIG"
+                echo '# Local bin (Linux)' >> "$FISH_CONFIG"
+                echo 'fish_add_path $HOME/.local/bin' >> "$FISH_CONFIG"
+            fi
+        fi
+
+        success "Fish config merged"
+    fi
+
     if ! $DRY_RUN; then
-        info "Setting up Fish abbreviations..."
+        info "Setting up Fish abbreviations (appending only)..."
         fish -c '
-            abbr -a --global ls "eza --icons --group-directories-first"
-            abbr -a --global ll "eza -la --icons --group-directories-first"
-            abbr -a --global lt "eza --tree --icons --level=2"
-            abbr -a --global cat "bat"
-            abbr -a --global find "fd"
-            abbr -a --global grep "rg"
-            abbr -a --global top "btop"
-            abbr -a --global lg "lazygit"
-            abbr -a --global cd "z"
-        '
+            abbr -a --global ls "eza --icons --group-directories-first" 2>/dev/null || true
+            abbr -a --global ll "eza -la --icons --group-directories-first" 2>/dev/null || true
+            abbr -a --global lt "eza --tree --icons --level=2" 2>/dev/null || true
+            abbr -a --global cat "bat" 2>/dev/null || true
+            abbr -a --global find "fd" 2>/dev/null || true
+            abbr -a --global grep "rg" 2>/dev/null || true
+            abbr -a --global top "btop" 2>/dev/null || true
+            abbr -a --global lg "lazygit" 2>/dev/null || true
+            abbr -a --global cd "z" 2>/dev/null || true
+        ' 2>/dev/null || true
         success "Fish abbreviations set"
     else
         info "[DRY-RUN] Would set Fish abbreviations"
     fi
-
-    # Zoxide + fzf init for fish
-    if ! grep -qF "zoxide" "$FISH_CONFIG_DIR/config.fish" 2>/dev/null; then
-        info "Adding zoxide + fzf init to fish config..."
-        cat >> "$FISH_CONFIG_DIR/config.fish" << 'FISHEOF'
-
-# zoxide
-zoxide init fish | source
-
-# fzf
-fzf --fish | source
-set -gx FZF_DEFAULT_OPTS '--height 40% --layout=reverse --border'
-if command -q fd
-    set -gx FZF_DEFAULT_COMMAND 'fd --type f --hidden --follow --exclude .git'
-    set -gx FZF_CTRL_T_COMMAND $FZF_DEFAULT_COMMAND
-    set -gx FZF_ALT_C_COMMAND 'fd --type d --hidden --follow --exclude .git'
-end
-FISHEOF
-        success "Zoxide + fzf init added"
-    else
-        success "Zoxide init already present"
-    fi
-
-    # Add ~/.local/bin to fish PATH on Linux
-    if [[ "$OS" == "debian" || "$OS" == "wsl" ]]; then
-        if ! grep -qF '.local/bin' "$FISH_CONFIG_DIR/config.fish" 2>/dev/null; then
-            echo '' >> "$FISH_CONFIG_DIR/config.fish"
-            echo '# Local bin (Linux)' >> "$FISH_CONFIG_DIR/config.fish"
-            echo 'fish_add_path $HOME/.local/bin' >> "$FISH_CONFIG_DIR/config.fish"
-        fi
-    fi
 else
-    # Zsh config
-    if [[ -f "$HOME/.zshrc" ]]; then
-        run_cmd cp "$HOME/.zshrc" "$HOME/.zshrc.bak.$(date +%s)"
+    ZSHRC="$HOME/.zshrc"
+
+    if [[ -f "$ZSHRC" ]]; then
+        info "Smart merging: preserving existing .zshrc..."
+        run_cmd cp "$ZSHRC" "$ZSHRC.bak.$(date +%s)"
         warn "Backed up existing .zshrc"
     fi
 
-    if [[ "$OS" == "macos" ]]; then
-        run_cmd cp "$CONFIGS_DIR/.zshrc" "$HOME/.zshrc"
-    else
-        # Deploy and patch for Linux
-        run_cmd cp "$CONFIGS_DIR/.zshrc" "$HOME/.zshrc"
-
-        # Patch Homebrew paths → Linux paths
-        sed -i 's|export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:\$PATH"|# PATH — system paths on Linux\nexport PATH="$HOME/.local/bin:$PATH"|' "$HOME/.zshrc"
-
-        # Patch zsh plugin source paths
-        sed -i 's|/opt/homebrew/share/zsh-syntax-highlighting/|/usr/share/zsh-syntax-highlighting/|g' "$HOME/.zshrc"
-        sed -i 's|/opt/homebrew/share/zsh-autosuggestions/|/usr/share/zsh-autosuggestions/|g' "$HOME/.zshrc"
-        sed -i 's|/opt/homebrew/share/zsh-completions|/usr/share/zsh-completions|g' "$HOME/.zshrc"
-
-        # Patch pnpm path for Linux
-        sed -i 's|\$HOME/Library/pnpm|\$HOME/.local/share/pnpm|g' "$HOME/.zshrc"
-
-        # Add fnm path for Linux (installed to ~/.local/share/fnm)
-        if ! grep -qF '.local/share/fnm' "$HOME/.zshrc" 2>/dev/null; then
-            sed -i '/# ─── fnm/i # fnm binary path (Linux)\nexport PATH="$HOME/.local/share/fnm:$PATH"\n' "$HOME/.zshrc"
+    if [[ ! -f "$ZSHRC" ]] || [[ ! -s "$ZSHRC" ]]; then
+        if [[ "$OS" == "macos" ]]; then
+            run_cmd cp "$CONFIGS_DIR/.zshrc" "$ZSHRC"
+        else
+            run_cmd cp "$CONFIGS_DIR/.zshrc" "$ZSHRC"
+            sed -i 's|export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:\$PATH"|# PATH — system paths on Linux\nexport PATH="$HOME/.local/bin:$PATH"|' "$ZSHRC"
+            sed -i 's|/opt/homebrew/share/zsh-syntax-highlighting/|/usr/share/zsh-syntax-highlighting/|g' "$ZSHRC"
+            sed -i 's|/opt/homebrew/share/zsh-autosuggestions/|/usr/share/zsh-autosuggestions/|g' "$ZSHRC"
+            sed -i 's|/opt/homebrew/share/zsh-completions|/usr/share/zsh-completions|g' "$ZSHRC"
+            sed -i 's|\$HOME/Library/pnpm|\$HOME/.local/share/pnpm|g' "$ZSHRC"
+            if ! grep -qF '.local/share/fnm' "$ZSHRC" 2>/dev/null; then
+                sed -i '/# ─── fnm/i # fnm binary path (Linux)\nexport PATH="$HOME/.local/share/fnm:$PATH"\n' "$ZSHRC"
+            fi
         fi
+        success "Zsh config deployed"
+    else
+        if ! grep -qF "starship init zsh" "$ZSHRC" 2>/dev/null; then
+            info "Adding Starship init to zsh config..."
+            echo '' >> "$ZSHRC"
+            echo '# Starship prompt' >> "$ZSHRC"
+            echo 'eval "$(starship init zsh)"' >> "$ZSHRC"
+        fi
+
+        if ! grep -qF "zsh-syntax-highlighting.zsh" "$ZSHRC" 2>/dev/null; then
+            info "Adding zsh-syntax-highlighting to zsh config..."
+            echo '' >> "$ZSHRC"
+            echo '# Zsh plugins - Syntax highlighting' >> "$ZSHRC"
+            if [[ "$OS" == "macos" ]]; then
+                echo 'if [[ -f /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]]; then' >> "$ZSHRC"
+                echo '    source /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh' >> "$ZSHRC"
+                echo 'fi' >> "$ZSHRC"
+            else
+                echo 'if [[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]]; then' >> "$ZSHRC"
+                echo '    source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh' >> "$ZSHRC"
+                echo 'fi' >> "$ZSHRC"
+            fi
+        fi
+
+        if ! grep -qF "zsh-autosuggestions.zsh" "$ZSHRC" 2>/dev/null; then
+            info "Adding zsh-autosuggestions to zsh config..."
+            echo '' >> "$ZSHRC"
+            echo '# Zsh plugins - Autosuggestions' >> "$ZSHRC"
+            if [[ "$OS" == "macos" ]]; then
+                echo 'if [[ -f /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]]; then' >> "$ZSHRC"
+                echo '    source /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh' >> "$ZSHRC"
+                echo '    ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='\''fg=8'\''' >> "$ZSHRC"
+                echo '    ZSH_AUTOSUGGEST_STRATEGY=(history completion)' >> "$ZSHRC"
+                echo 'fi' >> "$ZSHRC"
+            else
+                echo 'if [[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]]; then' >> "$ZSHRC"
+                echo '    source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh' >> "$ZSHRC"
+                echo '    ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='\''fg=8'\''' >> "$ZSHRC"
+                echo '    ZSH_AUTOSUGGEST_STRATEGY=(history completion)' >> "$ZSHRC"
+                echo 'fi' >> "$ZSHRC"
+            fi
+        fi
+
+        if ! grep -qF "zoxide init zsh" "$ZSHRC" 2>/dev/null; then
+            info "Adding zoxide init to zsh config..."
+            echo '' >> "$ZSHRC"
+            echo '# zoxide (smart cd)' >> "$ZSHRC"
+            echo 'eval "$(zoxide init zsh)"' >> "$ZSHRC"
+        fi
+
+        if ! grep -qF "fnm env" "$ZSHRC" 2>/dev/null; then
+            info "Adding fnm init to zsh config..."
+            echo '' >> "$ZSHRC"
+            echo '# fnm (Node version manager)' >> "$ZSHRC"
+            echo 'eval "$(fnm env --use-on-cd --shell zsh)"' >> "$ZSHRC"
+        fi
+
+        if ! grep -qF "fzf --zsh" "$ZSHRC" 2>/dev/null && ! grep -qF "~/.fzf.zsh" "$ZSHRC" 2>/dev/null; then
+            info "Adding fzf init to zsh config..."
+            echo '' >> "$ZSHRC"
+            echo '# fzf' >> "$ZSHRC"
+            echo "export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border'" >> "$ZSHRC"
+            echo 'if command -v fd &>/dev/null; then' >> "$ZSHRC"
+            echo '    export FZF_DEFAULT_COMMAND='\''fd --type f --hidden --follow --exclude .git'\''' >> "$ZSHRC"
+            echo '    export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"' >> "$ZSHRC"
+            echo '    export FZF_ALT_C_COMMAND='\''fd --type d --hidden --follow --exclude .git'\''' >> "$ZSHRC"
+            echo 'fi' >> "$ZSHRC"
+            echo 'if [[ -f ~/.fzf.zsh ]]; then' >> "$ZSHRC"
+            echo '    source ~/.fzf.zsh' >> "$ZSHRC"
+            echo 'elif command -v fzf &>/dev/null; then' >> "$ZSHRC"
+            echo '    eval "$(fzf --zsh 2>/dev/null)"' >> "$ZSHRC"
+            echo 'fi' >> "$ZSHRC"
+        fi
+
+        if [[ "$OS" == "debian" || "$OS" == "wsl" ]]; then
+            if ! grep -qF '.local/bin' "$ZSHRC" 2>/dev/null; then
+                echo '' >> "$ZSHRC"
+                echo '# Local bin (Linux)' >> "$ZSHRC"
+                echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$ZSHRC"
+            fi
+            if ! grep -qF '.local/share/fnm' "$ZSHRC" 2>/dev/null; then
+                echo '' >> "$ZSHRC"
+                echo '# fnm binary path (Linux)' >> "$ZSHRC"
+                echo 'export PATH="$HOME/.local/share/fnm:$PATH"' >> "$ZSHRC"
+            fi
+        fi
+
+        success "Zsh config merged"
     fi
-    success "Zsh config deployed"
 fi
 
 # ─── Git config for delta ────────────────────────────────────────────
@@ -875,10 +1017,18 @@ echo -e ""
 echo -e "  ${BOLD}Your terminal stack:${NC}"
 case "$OS" in
     macos)
-        echo -e "    👻 Ghostty              — terminal emulator"
+        if [[ "$TERMINAL_CHOICE" == "cmux" ]]; then
+            echo -e "    🔧 cmux                 — terminal emulator (built on Ghostty)"
+        else
+            echo -e "    👻 Ghostty              — terminal emulator"
+        fi
         ;;
     debian)
-        echo -e "    👻 Ghostty              — terminal (install separately on Linux)"
+        if [[ "$TERMINAL_CHOICE" == "cmux" ]]; then
+            echo -e "    🔧 cmux                 — terminal (macOS only, install manually on Linux)"
+        else
+            echo -e "    👻 Ghostty              — terminal (install separately on Linux)"
+        fi
         ;;
     wsl)
         echo -e "    💻 Windows Terminal      — recommended for WSL"
