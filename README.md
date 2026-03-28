@@ -64,6 +64,8 @@ cd terminal-setup && ./setup.sh
 ```bash
 ./setup.sh --fish       # Fish shell
 ./setup.sh --zsh        # Zsh + fish-like plugins
+./setup.sh --ghostty    # Ghostty terminal (macOS)
+./setup.sh --cmux       # cmux terminal (macOS, built on Ghostty)
 ./setup.sh --dry-run    # Preview what would be done (no changes)
 ```
 
@@ -84,11 +86,20 @@ bash <(curl -fsSL https://raw.githubusercontent.com/lewislulu/terminal-setup/mai
 | **Config** | `~/.config/fish/config.fish` | `~/.zshrc` |
 | **Best for** | Clean defaults, no fuss | Scripting, POSIX compat |
 
+## Choose Your Terminal
+
+| | 👻 Ghostty | 🔧 cmux |
+|---|-----------|---------|
+| **Platform** | macOS, Linux, WSL | macOS (Linux coming soon) |
+| **Features** | Fast, GPU-accelerated, clean config | Built on Ghostty + vertical tabs, split panes, notifications |
+| **Config** | `~/.config/ghostty/config` | Uses Ghostty config |
+| **Best for** | Minimalist, fast startup | Agent workflows, multitasking |
+
 ## Stack
 
 | Component | What |
 |-----------|------|
-| **[Ghostty](https://ghostty.org)** | GPU-accelerated terminal emulator |
+| **Ghostty** or **cmux** | Terminal emulator (your choice) |
 | **Fish** or **Zsh** | Shell (your choice) |
 | **[Starship](https://starship.rs)** | Cross-shell prompt (Catppuccin Mocha theme) |
 | **MesloLGS NF** | Nerd Font for icons & powerline glyphs |
