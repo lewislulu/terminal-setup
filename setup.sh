@@ -4,7 +4,7 @@
 #
 # Platforms: macOS, Debian/Ubuntu, Windows (via WSL)
 #
-# Stack: Ghostty + (Fish or Zsh) + Starship + Nerd Font (MesloLGS)
+# Stack: (Ghostty or cmux) + (Fish or Zsh) + Starship + Nerd Font (MesloLGS)
 # Tools: bat, eza, fd, ripgrep, btop, zoxide, jq, tldr, delta, lazygit, fzf
 # Node:  fnm (Fast Node Manager) — works with both Fish and Zsh
 # Theme: Catppuccin Mocha (Starship)
