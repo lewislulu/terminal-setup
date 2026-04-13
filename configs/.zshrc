@@ -27,6 +27,9 @@ if [[ -f /opt/homebrew/share/zsh-completions ]]; then
 fi
 autoload -Uz compinit && compinit
 
+# Substring + case-insensitive completion
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' 'r:|=*' 'l:|=*'
+
 # ─── History ─────────────────────────────────────────────────────────
 HISTSIZE=50000
 SAVEHIST=50000
