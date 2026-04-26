@@ -468,7 +468,7 @@ echo -e "${BOLD}  🛠  Step 5/9: CLI Tools${NC}"
 echo -e "${BOLD}══════════════════════════════════════════${NC}"
 
 install_cli_tools_macos() {
-    local TOOLS=(bat eza fd ripgrep btop zoxide jq tldr git-delta lazygit fzf)
+    local TOOLS=(bat eza fd ripgrep btop zoxide jq tldr git-delta lazygit fzf yazi)
     for tool in "${TOOLS[@]}"; do
         if brew list "$tool" &>/dev/null; then
             success "$tool already installed"
@@ -599,6 +599,36 @@ install_cli_tools_linux() {
             success "lazygit installed via apt"
         else
             install_bundled_bin lazygit || warn "Could not install lazygit — skipping"
+        fi
+    fi
+
+    # yazi — not in apt, use bundled binary or GitHub releases
+    if has_cmd yazi; then
+        success "yazi already installed"
+    else
+        info "Installing yazi..."
+        if ! install_bundled_bin yazi; then
+            local yazi_arch
+            case "$(uname -m)" in
+                x86_64)  yazi_arch="x86_64" ;;
+                aarch64) yazi_arch="aarch64" ;;
+                *) warn "Unsupported arch for yazi: $(uname -m) — skipping"; yazi_arch="" ;;
+            esac
+            if [[ -n "$yazi_arch" ]]; then
+                local yazi_url="https://github.com/sxyazi/yazi/releases/latest/download/yazi-${yazi_arch}-unknown-linux-musl.zip"
+                local yazi_tmp
+                yazi_tmp="$(mktemp -d)"
+                if $DRY_RUN; then
+                    echo -e "${YELLOW}[DRY-RUN]${NC} Download yazi from GitHub releases"
+                else
+                    curl -fsSL "$yazi_url" -o "$yazi_tmp/yazi.zip" \
+                        && unzip -q "$yazi_tmp/yazi.zip" -d "$yazi_tmp" \
+                        && sudo cp "$yazi_tmp/yazi-${yazi_arch}-unknown-linux-musl/yazi" /usr/local/bin/yazi \
+                        && sudo chmod +x /usr/local/bin/yazi
+                    rm -rf "$yazi_tmp"
+                fi
+                success "yazi installed"
+            fi
         fi
     fi
 
@@ -893,6 +923,26 @@ FISHEOF
         success "Zoxide init already present"
     fi
 
+    # Yazi shell wrapper for fish
+    if ! grep -qF 'yazi-cwd' "$FISH_CONFIG_DIR/config.fish" 2>/dev/null; then
+        info "Adding yazi shell wrapper to fish config..."
+        cat >> "$FISH_CONFIG_DIR/config.fish" << 'YAZIEOF'
+
+# yazi shell wrapper — use 'y' to change directory on exit
+function y
+    set tmp (mktemp -t "yazi-cwd.XXXXXX")
+    command yazi $argv --cwd-file="$tmp"
+    if read -z cwd < "$tmp"; and [ "$cwd" != "$PWD" ]; and test -d "$cwd"
+        builtin cd -- "$cwd"
+    end
+    rm -f -- "$tmp"
+end
+YAZIEOF
+        success "Yazi shell wrapper added"
+    else
+        success "Yazi shell wrapper already present"
+    fi
+
     # Add ~/.local/bin to fish PATH on Linux
     if [[ "$OS" == "debian" || "$OS" == "wsl" ]]; then
         if ! grep -qF '.local/bin' "$FISH_CONFIG_DIR/config.fish" 2>/dev/null; then
@@ -931,6 +981,25 @@ else
         fi
     fi
     success "Zsh config deployed"
+
+    # Yazi shell wrapper for zsh
+    if ! grep -qF 'yazi-cwd' "$HOME/.zshrc" 2>/dev/null; then
+        info "Adding yazi shell wrapper to .zshrc..."
+        cat >> "$HOME/.zshrc" << 'YAZIEOF'
+
+# yazi shell wrapper — use 'y' to change directory on exit
+function y() {
+    local tmp="$(mktemp -t "yazi-cwd.XXXXXX")" cwd
+    command yazi "$@" --cwd-file="$tmp"
+    IFS= read -r -d '' cwd < "$tmp"
+    [ "$cwd" != "$PWD" ] && [ -d "$cwd" ] && builtin cd -- "$cwd"
+    rm -f -- "$tmp"
+}
+YAZIEOF
+        success "Yazi shell wrapper added"
+    else
+        success "Yazi shell wrapper already present"
+    fi
 fi
 
 # ─── Git config for delta ────────────────────────────────────────────
@@ -986,6 +1055,9 @@ echo -e "    📊 btop                 — system monitor"
 echo -e "    🔀 lazygit + delta      — git tools"
 echo -e "    📁 zoxide               — smart cd"
 echo -e "    🔍 fzf                  — fuzzy finder"
+if has_cmd yazi; then
+    echo -e "    📂 yazi                 — terminal file manager (use 'y')"
+fi
 if has_cmd zellij; then
     echo -e "    🪟 zellij               — terminal multiplexer"
 fi

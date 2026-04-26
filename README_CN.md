@@ -103,6 +103,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/lewislulu/terminal-setup/mai
 | **[tldr](https://github.com/tldr-pages/tldr)** | 简化版 man 手册，附带示例 |
 | **[delta](https://github.com/dandavison/delta)** | 带语法高亮的 git diff |
 | **[lazygit](https://github.com/jesseduffield/lazygit)** | Git 终端 UI |
+| **[yazi](https://github.com/sxyazi/yazi)** | 终端文件管理器，支持图片预览（用 `y` 启动） |
 | **[fnm](https://github.com/Schniz/fnm)** | 快速 Node 版本管理器（Rust 编写） |
 | **[Zellij](https://zellij.dev)** | 现代终端复用器（可选） |
 
@@ -149,6 +150,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/lewislulu/terminal-setup/mai
 | `grep` | `rg` |
 | `top` | `btop` |
 | `lg` | `lazygit` |
+| `y` | `yazi`（退出时自动切换目录） |
 
 ## fzf 快捷键
 

@@ -103,6 +103,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/lewislulu/terminal-setup/mai
 | **[tldr](https://github.com/tldr-pages/tldr)** | Simplified man pages with examples |
 | **[delta](https://github.com/dandavison/delta)** | Beautiful git diffs with syntax highlighting |
 | **[lazygit](https://github.com/jesseduffield/lazygit)** | Git TUI |
+| **[yazi](https://github.com/sxyazi/yazi)** | Terminal file manager with image preview (use `y`) |
 | **[fnm](https://github.com/Schniz/fnm)** | Fast Node Manager (Rust) |
 | **[Zellij](https://zellij.dev)** | Modern terminal multiplexer (optional) |
 
@@ -149,6 +150,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/lewislulu/terminal-setup/mai
 | `grep` | `rg` |
 | `top` | `btop` |
 | `lg` | `lazygit` |
+| `y` | `yazi` (changes directory on exit) |
 
 ## fzf Keybindings
 
