@@ -1,6 +1,6 @@
 # 🖥️ terminal-setup
 
-一键配置终端环境，支持 **macOS**、**Debian/Ubuntu** 和 **Windows (WSL)**。新机器跑一个脚本，几分钟搞定完整终端。
+一键配置终端环境，支持 **macOS**、**Arch Linux**、**Debian/Ubuntu** 和 **Windows (WSL)**。新机器跑一个脚本，几分钟搞定完整终端。
 
 **🇬🇧 [English Version](README.md)**
 
@@ -23,15 +23,23 @@
 | 平台 | 状态 | 包管理器 |
 |------|------|---------|
 | 🍎 **macOS** | ✅ 主力平台 — 长期使用验证 | Homebrew |
+| 🐧 **Arch Linux** | 🧪 实验性 — 可用但未经长期测试 | pacman |
 | 🐧 **Debian / Ubuntu** | 🧪 实验性 — 可用但未经长期测试 | apt + 内置二进制 |
 | 🪟 **Windows (WSL)** | 🧪 实验性 — 可用但未经长期测试 | apt（WSL 内部） |
 
-> **注意：** 本脚本主要在 macOS 上开发和测试。Linux（Debian/Ubuntu）和 WSL 支持已添加且可用，但尚未经过长期使用测试。欢迎提 Issue 和 PR！
+> **注意：** 本脚本主要在 macOS 上开发和测试。Linux（Arch、Debian/Ubuntu）和 WSL 支持已添加且可用，但尚未经过长期使用测试。欢迎提 Issue 和 PR！
 | 🪟 **Windows (原生)** | ⛔ 不支持 | 请先安装 WSL |
 
 ## 快速开始
 
 ### macOS
+
+```bash
+git clone https://github.com/lewislulu/terminal-setup.git
+cd terminal-setup && ./setup.sh
+```
+
+### Arch Linux
 
 ```bash
 git clone https://github.com/lewislulu/terminal-setup.git
@@ -112,7 +120,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/lewislulu/terminal-setup/mai
 2. 安装 **Ghostty** 终端（macOS；Linux 需手动安装）
 3. 下载 **MesloLGS NF** Nerd 字体
 4. 安装你选择的 **Shell** + 插件
-5. 安装所有 **CLI 工具**（macOS 用 Homebrew，Linux 用 apt + GitHub releases）
+5. 安装所有 **CLI 工具**（macOS 用 Homebrew，Arch Linux 用 pacman，Debian 用 apt + GitHub releases）
 6. 安装 **Starship** 提示符 + Catppuccin Mocha 配置
 7. 安装 **fnm** + **Node.js** LTS（可选）
 8. 安装 **Zellij** 终端复用器（可选）
@@ -123,6 +131,14 @@ bash <(curl -fsSL https://raw.githubusercontent.com/lewislulu/terminal-setup/mai
 ### macOS
 - 完整支持，所有工具通过 Homebrew 安装
 - Ghostty 作为原生 macOS 应用安装
+
+### Arch Linux
+- 所有 CLI 工具优先通过 pacman 安装（`sudo pacman -S`）
+- `bat`、`fd` 包名即标准名，无需创建软链接
+- 字体安装到 `~/.local/share/fonts/`，也可通过 `ttf-meslo-nerd-font` 包安装
+- Ghostty 在 [community] 仓库中，直接用 pacman 安装
+- Zsh 插件通过 pacman 或 git clone 安装
+- 不依赖 AUR 助手（仅使用官方仓库）
 
 ### Debian / Ubuntu
 - CLI 工具优先用 apt 安装，apt 没有的从 GitHub releases 下载（delta、lazygit、eza）
