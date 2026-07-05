@@ -1,6 +1,6 @@
 # 🖥️ terminal-setup
 
-One-script terminal environment setup for **macOS**, **Debian/Ubuntu**, and **Windows (WSL)**. Run on a fresh machine, get a fully configured terminal in minutes.
+One-script terminal environment setup for **macOS**, **Arch Linux**, **Debian/Ubuntu**, and **Windows (WSL)**. Run on a fresh machine, get a fully configured terminal in minutes.
 
 **🇨🇳 [中文版文档](README_CN.md)**
 
@@ -23,15 +23,23 @@ One-script terminal environment setup for **macOS**, **Debian/Ubuntu**, and **Wi
 | Platform | Status | Package Manager |
 |----------|--------|----------------|
 | 🍎 **macOS** | ✅ Primary — battle-tested | Homebrew |
+| 🐧 **Arch Linux** | 🧪 Experimental — works but not extensively tested | pacman |
 | 🐧 **Debian / Ubuntu** | 🧪 Experimental — works but not extensively tested | apt + bundled binaries |
 | 🪟 **Windows (WSL)** | 🧪 Experimental — works but not extensively tested | apt (inside WSL) |
 | 🪟 **Windows (native)** | ⛔ Not supported | Use WSL instead |
 
-> **Note:** This script is primarily developed and tested on macOS. Linux (Debian/Ubuntu) and WSL support has been added and works, but has not gone through long-term usage testing. Issues and PRs welcome!
+> **Note:** This script is primarily developed and tested on macOS. Linux (Arch, Debian/Ubuntu) and WSL support has been added and works, but has not gone through long-term usage testing. Issues and PRs welcome!
 
 ## Quick Start
 
 ### macOS
+
+```bash
+git clone https://github.com/lewislulu/terminal-setup.git
+cd terminal-setup && ./setup.sh
+```
+
+### Arch Linux
 
 ```bash
 git clone https://github.com/lewislulu/terminal-setup.git
@@ -112,7 +120,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/lewislulu/terminal-setup/mai
 2. Installs **Ghostty** terminal (macOS; Linux users install separately)
 3. Downloads **MesloLGS NF** nerd fonts
 4. Installs your **shell** of choice + plugins
-5. Installs all **CLI tools** (Homebrew on macOS, apt + GitHub releases on Linux)
+5. Installs all **CLI tools** (Homebrew on macOS, pacman on Arch Linux, apt + GitHub releases on Debian)
 6. Installs **Starship** prompt with Catppuccin Mocha config
 7. Installs **fnm** + **Node.js** LTS (optional)
 8. Installs **Zellij** terminal multiplexer (optional)
@@ -123,6 +131,14 @@ bash <(curl -fsSL https://raw.githubusercontent.com/lewislulu/terminal-setup/mai
 ### macOS
 - Full support, everything installs via Homebrew
 - Ghostty installs as a native macOS app
+
+### Arch Linux
+- All CLI tools install via pacman (`sudo pacman -S`)
+- `bat` and `fd` use standard names — no symlinks needed
+- Fonts install to `~/.local/share/fonts/`, also available via `ttf-meslo-nerd-font`
+- Ghostty is available in the [community] repo — install via pacman directly
+- Zsh plugins install via pacman or git clone
+- Does not require AUR helpers (uses official repos only)
 
 ### Debian / Ubuntu
 - CLI tools install via apt where available, GitHub releases for others (delta, lazygit, eza)

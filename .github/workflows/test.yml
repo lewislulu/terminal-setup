@@ -1,0 +1,43 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: '.'
+          severity: style
+
+  bats:
+    name: BATS tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install BATS
+        run: sudo apt-get update && sudo apt-get install -y bats
+      - name: Run tests
+        run: cd tests && ./run_tests.sh
+
+  arch-docker:
+    name: Arch Linux (Docker)
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    steps:
+      - name: Install system dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm bats git base-devel
+      - uses: actions/checkout@v4
+      - name: Run BATS tests
+        run: cd tests && ./run_tests.sh

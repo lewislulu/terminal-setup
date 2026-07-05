@@ -2,7 +2,7 @@
 #
 # terminal-setup — One-script terminal environment setup
 #
-# Platforms: macOS, Debian/Ubuntu, Windows (via WSL)
+# Platforms: macOS, Debian/Ubuntu, Arch Linux, Windows (via WSL)
 #
 # Stack: Ghostty + (Fish or Zsh) + Starship + Nerd Font (MesloLGS)
 # Tools: bat, eza, fd, ripgrep, btop, zoxide, jq, tldr, delta, lazygit, fzf
@@ -73,6 +73,8 @@ detect_os() {
             # Check if running inside WSL
             if grep -qiE '(microsoft|wsl)' /proc/version 2>/dev/null; then
                 echo "wsl"
+            elif [[ -f /etc/arch-release ]] || grep -qi 'arch' /etc/os-release 2>/dev/null; then
+                echo "arch"
             elif [[ -f /etc/debian_version ]] || grep -qi 'debian\|ubuntu' /etc/os-release 2>/dev/null; then
                 echo "debian"
             else
@@ -94,6 +96,9 @@ case "$OS" in
     macos)
         info "Detected ${BOLD}macOS${NC}"
         ;;
+    arch)
+        info "Detected ${BOLD}Arch Linux${NC}"
+        ;;
     debian)
         info "Detected ${BOLD}Debian/Ubuntu Linux${NC}"
         ;;
@@ -104,7 +109,7 @@ case "$OS" in
         error "Native Windows (MINGW/MSYS/Cygwin) is not supported.\n  Please install WSL: https://learn.microsoft.com/en-us/windows/wsl/install\n  Then run this script inside WSL."
         ;;
     *)
-        error "Unsupported OS: $(uname -s)\n  This script supports macOS, Debian/Ubuntu, and Windows WSL."
+        error "Unsupported OS: $(uname -s)\n  This script supports macOS, Debian/Ubuntu, Arch Linux, and Windows WSL."
         ;;
 esac
 
@@ -157,6 +162,14 @@ pkg_install() {
             fi
             info "Installing $pkg..."
             run_cmd brew install "$pkg"
+            ;;
+        arch)
+            if pacman -Qi "$pkg" &>/dev/null 2>&1; then
+                success "$pkg already installed"
+                return 0
+            fi
+            info "Installing $pkg..."
+            run_cmd sudo pacman -S --noconfirm "$pkg"
             ;;
         debian|wsl)
             if dpkg -s "$pkg" &>/dev/null 2>&1; then
@@ -213,6 +226,17 @@ case "$OS" in
             success "Homebrew already installed"
         fi
         ;;
+    arch)
+        info "Updating pacman package database..."
+        run_cmd sudo pacman -Syu --noconfirm
+        # Ensure basic build tools are available
+        pkg_install "curl"
+        pkg_install "git"
+        pkg_install "wget"
+        pkg_install "unzip"
+        pkg_install "base-devel"
+        success "pacman package manager ready"
+        ;;
     debian|wsl)
         info "Updating apt package index..."
         run_cmd sudo apt-get update
@@ -240,6 +264,15 @@ case "$OS" in
             success "Ghostty installed"
         else
             success "Ghostty already installed"
+        fi
+        ;;
+    arch)
+        if has_cmd ghostty; then
+            success "Ghostty already installed"
+        else
+            info "Installing Ghostty..."
+            run_cmd sudo pacman -S --noconfirm ghostty
+            success "Ghostty installed"
         fi
         ;;
     debian)
@@ -275,7 +308,7 @@ case "$OS" in
     macos)
         FONT_DIR="$HOME/Library/Fonts"
         ;;
-    debian|wsl)
+    arch|debian|wsl)
         FONT_DIR="$HOME/.local/share/fonts"
         ;;
 esac
@@ -309,7 +342,7 @@ else
         fi
     done
     # Rebuild font cache on Linux
-    if [[ "$OS" == "debian" || "$OS" == "wsl" ]]; then
+    if [[ "$OS" == "debian" || "$OS" == "arch" || "$OS" == "wsl" ]]; then
         if has_cmd fc-cache; then
             run_cmd fc-cache -fv "$FONT_DIR"
         fi
@@ -377,14 +410,19 @@ install_shell_macos() {
 install_shell_linux() {
     if [[ "$SHELL_CHOICE" == "fish" ]]; then
         if ! has_cmd fish; then
-            # Fish PPA for latest version on Ubuntu/Debian
-            if [[ -f /etc/lsb-release ]] && grep -qi ubuntu /etc/lsb-release 2>/dev/null; then
-                info "Adding Fish PPA for latest version..."
-                run_cmd sudo apt-add-repository -y ppa:fish-shell/release-3
-                run_cmd sudo apt-get update
+            if [[ "$OS" == "arch" ]]; then
+                info "Installing Fish..."
+                run_cmd sudo pacman -S --noconfirm fish
+            else
+                # Fish PPA for latest version on Ubuntu/Debian
+                if [[ -f /etc/lsb-release ]] && grep -qi ubuntu /etc/lsb-release 2>/dev/null; then
+                    info "Adding Fish PPA for latest version..."
+                    run_cmd sudo apt-add-repository -y ppa:fish-shell/release-3
+                    run_cmd sudo apt-get update
+                fi
+                info "Installing Fish..."
+                run_cmd sudo apt-get install -y fish
             fi
-            info "Installing Fish..."
-            run_cmd sudo apt-get install -y fish
             success "Fish installed"
         else
             success "Fish already installed"
@@ -407,42 +445,77 @@ install_shell_linux() {
         # Install Zsh if not present
         if ! has_cmd zsh; then
             info "Installing Zsh..."
-            run_cmd sudo apt-get install -y zsh
+            if [[ "$OS" == "arch" ]]; then
+                run_cmd sudo pacman -S --noconfirm zsh
+            else
+                run_cmd sudo apt-get install -y zsh
+            fi
             success "Zsh installed"
         else
             success "Zsh already installed"
         fi
 
-        # Install Zsh plugins from apt or git clone
+        # Install Zsh plugins
         local ZSH_PLUGINS_DIR="/usr/share"
-        local need_clone=false
 
-        # zsh-autosuggestions
-        if [[ -f "$ZSH_PLUGINS_DIR/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
-            success "zsh-autosuggestions already installed"
-        elif dpkg -s zsh-autosuggestions &>/dev/null 2>&1; then
-            success "zsh-autosuggestions already installed"
-        else
-            info "Installing zsh-autosuggestions..."
-            run_cmd sudo apt-get install -y zsh-autosuggestions 2>/dev/null || {
-                info "apt package not available, cloning from git..."
-                run_cmd sudo git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_PLUGINS_DIR/zsh-autosuggestions"
-            }
-            success "zsh-autosuggestions installed"
-        fi
+        if [[ "$OS" == "arch" ]]; then
+            # Arch: try pacman first, then git clone
+            # zsh-autosuggestions
+            if [[ -f "$ZSH_PLUGINS_DIR/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
+                success "zsh-autosuggestions already installed"
+            elif pacman -Qi zsh-autosuggestions &>/dev/null 2>&1; then
+                success "zsh-autosuggestions already installed"
+            else
+                info "Installing zsh-autosuggestions..."
+                run_cmd sudo pacman -S --noconfirm zsh-autosuggestions 2>/dev/null || {
+                    info "pacman package not available, cloning from git..."
+                    run_cmd sudo git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_PLUGINS_DIR/zsh-autosuggestions"
+                }
+                success "zsh-autosuggestions installed"
+            fi
 
-        # zsh-syntax-highlighting
-        if [[ -f "$ZSH_PLUGINS_DIR/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]; then
-            success "zsh-syntax-highlighting already installed"
-        elif dpkg -s zsh-syntax-highlighting &>/dev/null 2>&1; then
-            success "zsh-syntax-highlighting already installed"
+            # zsh-syntax-highlighting
+            if [[ -f "$ZSH_PLUGINS_DIR/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]; then
+                success "zsh-syntax-highlighting already installed"
+            elif pacman -Qi zsh-syntax-highlighting &>/dev/null 2>&1; then
+                success "zsh-syntax-highlighting already installed"
+            else
+                info "Installing zsh-syntax-highlighting..."
+                run_cmd sudo pacman -S --noconfirm zsh-syntax-highlighting 2>/dev/null || {
+                    info "pacman package not available, cloning from git..."
+                    run_cmd sudo git clone https://github.com/zsh-users/zsh-syntax-highlighting "$ZSH_PLUGINS_DIR/zsh-syntax-highlighting"
+                }
+                success "zsh-syntax-highlighting installed"
+            fi
         else
-            info "Installing zsh-syntax-highlighting..."
-            run_cmd sudo apt-get install -y zsh-syntax-highlighting 2>/dev/null || {
-                info "apt package not available, cloning from git..."
-                run_cmd sudo git clone https://github.com/zsh-users/zsh-syntax-highlighting "$ZSH_PLUGINS_DIR/zsh-syntax-highlighting"
-            }
-            success "zsh-syntax-highlighting installed"
+            # Debian/WSL: try apt first, then git clone
+            # zsh-autosuggestions
+            if [[ -f "$ZSH_PLUGINS_DIR/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
+                success "zsh-autosuggestions already installed"
+            elif dpkg -s zsh-autosuggestions &>/dev/null 2>&1; then
+                success "zsh-autosuggestions already installed"
+            else
+                info "Installing zsh-autosuggestions..."
+                run_cmd sudo apt-get install -y zsh-autosuggestions 2>/dev/null || {
+                    info "apt package not available, cloning from git..."
+                    run_cmd sudo git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_PLUGINS_DIR/zsh-autosuggestions"
+                }
+                success "zsh-autosuggestions installed"
+            fi
+
+            # zsh-syntax-highlighting
+            if [[ -f "$ZSH_PLUGINS_DIR/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]; then
+                success "zsh-syntax-highlighting already installed"
+            elif dpkg -s zsh-syntax-highlighting &>/dev/null 2>&1; then
+                success "zsh-syntax-highlighting already installed"
+            else
+                info "Installing zsh-syntax-highlighting..."
+                run_cmd sudo apt-get install -y zsh-syntax-highlighting 2>/dev/null || {
+                    info "apt package not available, cloning from git..."
+                    run_cmd sudo git clone https://github.com/zsh-users/zsh-syntax-highlighting "$ZSH_PLUGINS_DIR/zsh-syntax-highlighting"
+                }
+                success "zsh-syntax-highlighting installed"
+            fi
         fi
 
         ZSH_PATH="$(which zsh)"
@@ -458,7 +531,7 @@ install_shell_linux() {
 
 case "$OS" in
     macos)  install_shell_macos ;;
-    debian|wsl) install_shell_linux ;;
+    arch|debian|wsl) install_shell_linux ;;
 esac
 
 # ─── Step 5: CLI Tools ──────────────────────────────────────────────
@@ -608,8 +681,16 @@ install_cli_tools_linux() {
     fi
 }
 
+install_cli_tools_arch() {
+    local PACMAN_TOOLS=(bat eza fd ripgrep btop zoxide jq tealdeer git-delta lazygit fzf)
+    for tool in "${PACMAN_TOOLS[@]}"; do
+        pkg_install "$tool"
+    done
+}
+
 case "$OS" in
     macos)      install_cli_tools_macos ;;
+    arch)       install_cli_tools_arch ;;
     debian|wsl) install_cli_tools_linux ;;
 esac
 
@@ -626,6 +707,10 @@ else
         macos)
             info "Installing Starship..."
             run_cmd brew install starship
+            ;;
+        arch)
+            info "Installing Starship..."
+            run_cmd sudo pacman -S --noconfirm starship
             ;;
         debian|wsl)
             info "Installing Starship..."
@@ -694,6 +779,10 @@ else
                 info "Installing fnm (Fast Node Manager)..."
                 run_cmd brew install fnm
                 ;;
+            arch)
+                info "Installing fnm (Fast Node Manager)..."
+                run_cmd sudo pacman -S --noconfirm fnm
+                ;;
             debian|wsl)
                 info "Installing fnm via official installer..."
                 run_cmd bash -c "$(curl -fsSL https://fnm.vercel.app/install)" -- --skip-shell
@@ -734,6 +823,10 @@ else
             macos)
                 info "Installing Zellij..."
                 run_cmd brew install zellij
+                ;;
+            arch)
+                info "Installing Zellij..."
+                run_cmd sudo pacman -S --noconfirm zellij
                 ;;
             debian|wsl)
                 info "Installing Zellij..."
@@ -782,7 +875,7 @@ deploy_ghostty_config() {
         macos)
             ghostty_config_dir="$HOME/Library/Application Support/com.mitchellh.ghostty"
             ;;
-        debian)
+        arch|debian)
             ghostty_config_dir="$HOME/.config/ghostty"
             ;;
         wsl)
@@ -805,7 +898,7 @@ deploy_ghostty_config() {
         macos)
             run_cmd cp "$CONFIGS_DIR/ghostty.config" "$ghostty_config_dir/config.ghostty"
             ;;
-        debian|wsl)
+        arch|debian|wsl)
             run_cmd cp "$CONFIGS_DIR/ghostty.config" "$ghostty_config_dir/config"
             ;;
     esac
@@ -894,7 +987,7 @@ FISHEOF
     fi
 
     # Add ~/.local/bin to fish PATH on Linux
-    if [[ "$OS" == "debian" || "$OS" == "wsl" ]]; then
+    if [[ "$OS" == "arch" || "$OS" == "debian" || "$OS" == "wsl" ]]; then
         if ! grep -qF '.local/bin' "$FISH_CONFIG_DIR/config.fish" 2>/dev/null; then
             echo '' >> "$FISH_CONFIG_DIR/config.fish"
             echo '# Local bin (Linux)' >> "$FISH_CONFIG_DIR/config.fish"
@@ -962,6 +1055,9 @@ echo -e ""
 echo -e "  ${BOLD}Your terminal stack:${NC}"
 case "$OS" in
     macos)
+        echo -e "    👻 Ghostty              — terminal emulator"
+        ;;
+    arch)
         echo -e "    👻 Ghostty              — terminal emulator"
         ;;
     debian)
