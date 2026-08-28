@@ -903,11 +903,11 @@ install_miniforge() {
 
     info "Installing Miniforge..."
     if $DRY_RUN; then
-        echo -e "${YELLOW}[DRY-RUN]${NC} curl -fsSL $url -o $tmp_dir/$installer"
+        echo -e "${YELLOW}[DRY-RUN]${NC} curl -fL --progress-bar $url -o $tmp_dir/$installer"
         echo -e "${YELLOW}[DRY-RUN]${NC} bash $tmp_dir/$installer -b -p $HOME/miniforge3"
         echo -e "${YELLOW}[DRY-RUN]${NC} $HOME/miniforge3/bin/conda config --set auto_activate_base false"
     else
-        curl -fsSL "$url" -o "$tmp_dir/$installer"
+        curl -fL --progress-bar "$url" -o "$tmp_dir/$installer"
         bash "$tmp_dir/$installer" -b -p "$HOME/miniforge3"
         "$HOME/miniforge3/bin/conda" config --set auto_activate_base false
         rm -rf "$tmp_dir"
