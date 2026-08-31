@@ -25,9 +25,9 @@
 | 🍎 **macOS** | ✅ 主力平台 — 长期使用验证 | Homebrew |
 | 🐧 **Debian / Ubuntu** | 🧪 实验性 — 可用但未经长期测试 | apt + 内置二进制 |
 | 🪟 **Windows (WSL)** | 🧪 实验性 — 可用但未经长期测试 | apt（WSL 内部） |
+| 🪟 **Windows (原生)** | ⛔ 不支持 | 请先安装 WSL |
 
 > **注意：** 本脚本主要在 macOS 上开发和测试。Linux（Debian/Ubuntu）和 WSL 支持已添加且可用，但尚未经过长期使用测试。欢迎提 Issue 和 PR！
-| 🪟 **Windows (原生)** | ⛔ 不支持 | 请先安装 WSL |
 
 ## 快速开始
 
@@ -103,7 +103,17 @@ bash <(curl -fsSL https://raw.githubusercontent.com/lewislulu/terminal-setup/mai
 | **[tldr](https://github.com/tldr-pages/tldr)** | 简化版 man 手册，附带示例 |
 | **[delta](https://github.com/dandavison/delta)** | 带语法高亮的 git diff |
 | **[lazygit](https://github.com/jesseduffield/lazygit)** | Git 终端 UI |
+| **[aria2](https://aria2.github.io)** | 支持断点续传和多连接的大文件下载器 |
+| **[FFmpeg](https://ffmpeg.org)** | 音视频转换、探测、抽帧工具（可选） |
 | **[fnm](https://github.com/Schniz/fnm)** | 快速 Node 版本管理器（Rust 编写） |
+| **[pnpm](https://pnpm.io)** | 快速、省磁盘空间的 Node 包管理器 |
+| **[uv](https://docs.astral.sh/uv/)** | 快速 Python 包/项目管理器 |
+| **python3-venv** | Python 官方虚拟环境支持 |
+| **[pipx](https://pipx.pypa.io)** | 隔离安装 Python 命令行工具 |
+| **[direnv](https://direnv.net)** | 按项目自动加载环境变量 |
+| **[nvtop](https://github.com/Syllo/nvtop)** | GPU 进程监控，适合机器学习/深度学习 |
+| **[Miniforge](https://github.com/conda-forge/miniforge)** | 科学计算/机器学习常用的 conda/mamba 环境（可选） |
+| **[hfd](https://gist.github.com/padeoe/697678ab8e528b85a2a7bddafea1fa4f)** | Hugging Face 下载器（可选，社区脚本） |
 | **[Zellij](https://zellij.dev)** | 现代终端复用器（可选） |
 
 ## 脚本做了什么
@@ -113,10 +123,11 @@ bash <(curl -fsSL https://raw.githubusercontent.com/lewislulu/terminal-setup/mai
 3. 下载 **MesloLGS NF** Nerd 字体
 4. 安装你选择的 **Shell** + 插件
 5. 安装所有 **CLI 工具**（macOS 用 Homebrew，Linux 用 apt + GitHub releases）
-6. 安装 **Starship** 提示符 + Catppuccin Mocha 配置
-7. 安装 **fnm** + **Node.js** LTS（可选）
-8. 安装 **Zellij** 终端复用器（可选）
-9. 部署所有配置文件（已有配置会加时间戳备份）
+6. 安装 **Python / 深度学习开发辅助工具**（`uv`、`python3-venv`、`pipx`、`direnv`、`nvtop`），并可选安装 **Miniforge** / **hfd**
+7. 安装 **Starship** 提示符 + Catppuccin Mocha 配置
+8. 安装 **fnm** + **Node.js** LTS（可选），如果有 Node 会继续安装 **pnpm**
+9. 安装 **Zellij** 终端复用器（可选）
+10. 部署所有配置文件（已有配置会加时间戳备份）
 
 ## 平台说明
 
@@ -125,14 +136,17 @@ bash <(curl -fsSL https://raw.githubusercontent.com/lewislulu/terminal-setup/mai
 - Ghostty 作为原生 macOS 应用安装
 
 ### Debian / Ubuntu
+- 安装软件前可选配置 [清华 TUNA apt 镜像源](https://mirrors.tuna.tsinghua.edu.cn/help/ubuntu/)
 - CLI 工具优先用 apt 安装，apt 没有的从 GitHub releases 下载（delta、lazygit、eza）
 - `bat` 在 Debian 上叫 `batcat`，`fd` 叫 `fdfind` — 脚本会自动创建软链接
 - 字体安装到 `~/.local/share/fonts/`
 - Ghostty 不在 apt 里 — 可通过 [snap、源码编译](https://ghostty.org/docs/install) 安装，或用其他终端
 - Zsh 插件通过 apt 或 git clone 安装
+- 修改 apt 源前会自动备份原始源文件；如果已经是清华源，脚本会跳过，不重复覆盖
 
 ### Windows (WSL)
 - 所有操作在 WSL 内部执行（Ubuntu/Debian 层）
+- 国内 WSL 用户可以选择启用清华 TUNA apt 镜像源
 - 终端模拟器在 Windows 侧运行 — 推荐 [Windows Terminal](https://aka.ms/terminal) 或 [Ghostty for Windows](https://ghostty.org)
 - 脚本自动检测 WSL 环境并适配
 - 如果在原生 Windows（MINGW/Git Bash）中运行，脚本会提示安装 WSL
@@ -167,6 +181,59 @@ fnm default 22            # 设置默认版本
 fnm use 22                # 当前 shell 切换
 echo "22" > .node-version # 进入目录自动切换
 ```
+
+## Python / 深度学习开发工具
+
+```bash
+uv venv                         # 创建 .venv
+source .venv/bin/activate       # 激活项目虚拟环境
+uv pip install torch numpy      # 安装 Python 包
+pipx install ruff               # 隔离安装 Python CLI 工具
+direnv allow                    # 信任当前项目的 .envrc
+nvtop                           # 查看 GPU 使用率和进程
+hfd Qwen/Qwen2.5-7B-Instruct --local-dir models/qwen2.5-7b -x 16
+```
+
+可选的 Miniforge 用法：
+
+```bash
+conda create -n llm python=3.11
+conda activate llm
+mamba install numpy pandas scikit-learn
+```
+
+Miniforge 安装后会设置 `auto_activate_base false`，所以新终端不会自动进入 `base` 环境。
+
+国内网络可以选择启用镜像加速：pip/uv 使用清华 TUNA PyPI 镜像，conda 使用中科大 USTC 的 Miniforge/Mamba 推荐配置。脚本会部署：
+
+```text
+~/.config/pip/pip.conf
+~/.config/uv/uv.toml
+~/.condarc
+```
+
+对应模板在 `configs/pip.conf`、`configs/uv.toml`、`configs/.condarc`。已有配置会自动备份后再覆盖。
+
+深度学习项目里的 `.envrc` 示例：
+
+```bash
+source .venv/bin/activate
+export CUDA_VISIBLE_DEVICES=0
+export HF_HOME=/data/hf-cache
+```
+
+`hfd` 是可选项，因为它是社区下载脚本，不是 Hugging Face 官方 CLI。脚本会先询问，确认后才安装。
+
+## 下载 / 媒体处理工具
+
+```bash
+aria2c -x 16 -s 16 -c URL       # 多连接断点续传下载
+ffmpeg -i input.mp4 output.mp3  # 提取/转换音频
+ffmpeg -i input.mp4 -vf fps=1 frames/%06d.jpg
+ffprobe input.mp4               # 查看媒体元信息
+```
+
+FFmpeg 是可选项，脚本会先询问，确认后才安装。
 
 ## SSH Key 切换
 

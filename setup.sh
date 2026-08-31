@@ -5,8 +5,9 @@
 # Platforms: macOS, Debian/Ubuntu, Windows (via WSL)
 #
 # Stack: Ghostty + (Fish or Zsh) + Starship + Nerd Font (MesloLGS)
-# Tools: bat, eza, fd, ripgrep, btop, zoxide, jq, tldr, delta, lazygit, fzf
-# Node:  fnm (Fast Node Manager) — works with both Fish and Zsh
+# Tools: bat, eza, fd, ripgrep, btop, zoxide, jq, tldr, delta, lazygit, fzf, aria2
+# ML/dev: uv, python3-venv, pipx, direnv, nvtop
+# Node:  fnm (Fast Node Manager) + pnpm — works with both Fish and Zsh
 # Theme: Catppuccin Mocha (Starship)
 #
 # Usage:
@@ -191,10 +192,108 @@ has_cmd() {
     command -v "$1" &>/dev/null
 }
 
+configure_apt_tuna_mirror() {
+    if [[ "$OS" != "debian" && "$OS" != "wsl" ]]; then
+        return 0
+    fi
+
+    echo ""
+    echo -e "  Use Tsinghua TUNA apt mirror for faster downloads in China?"
+    echo -e "  Mirror: ${BOLD}https://mirrors.tuna.tsinghua.edu.cn${NC}"
+    printf "  Configure apt mirror? (y/N): "
+    read -r CONFIGURE_APT_MIRROR
+    if [[ ! "$CONFIGURE_APT_MIRROR" =~ ^[Yy]$ ]]; then
+        info "Keeping existing apt sources"
+        return 0
+    fi
+
+    local codename
+    codename=""
+    if has_cmd lsb_release; then
+        codename="$(lsb_release -cs 2>/dev/null || true)"
+    fi
+    if [[ -z "$codename" && -r /etc/os-release ]]; then
+        # shellcheck disable=SC1091
+        source /etc/os-release
+        codename="${VERSION_CODENAME:-}"
+    fi
+    if [[ -z "$codename" ]]; then
+        warn "Could not detect Debian/Ubuntu codename — skipping apt mirror configuration"
+        return 0
+    fi
+
+    local mirror="https://mirrors.tuna.tsinghua.edu.cn/ubuntu"
+    local security_mirror="$mirror"
+    local components="main restricted universe multiverse"
+    local signed_by="/usr/share/keyrings/ubuntu-archive-keyring.gpg"
+    local deb822_file=""
+    if [[ -r /etc/os-release ]] && grep -qi '^ID=debian' /etc/os-release; then
+        mirror="https://mirrors.tuna.tsinghua.edu.cn/debian"
+        security_mirror="https://mirrors.tuna.tsinghua.edu.cn/debian-security"
+        components="main contrib non-free non-free-firmware"
+        signed_by="/usr/share/keyrings/debian-archive-keyring.gpg"
+    fi
+
+    local timestamp
+    timestamp="$(date +%s)"
+    info "Configuring apt mirror for $codename..."
+
+    if [[ -f /etc/apt/sources.list.d/ubuntu.sources ]]; then
+        deb822_file="/etc/apt/sources.list.d/ubuntu.sources"
+    elif [[ -f /etc/apt/sources.list.d/debian.sources ]]; then
+        deb822_file="/etc/apt/sources.list.d/debian.sources"
+    fi
+
+    if [[ -n "$deb822_file" ]]; then
+        if grep -q "mirrors.tuna.tsinghua.edu.cn" "$deb822_file" 2>/dev/null; then
+            success "apt mirror already configured: $deb822_file"
+            return 0
+        fi
+        run_cmd sudo cp "$deb822_file" "${deb822_file}.bak.$timestamp"
+        if $DRY_RUN; then
+            echo -e "${YELLOW}[DRY-RUN]${NC} write TUNA DEB822 sources to $deb822_file"
+        else
+            sudo tee "$deb822_file" >/dev/null <<EOF
+Types: deb
+URIs: $mirror
+Suites: $codename ${codename}-updates ${codename}-backports
+Components: $components
+Signed-By: $signed_by
+
+Types: deb
+URIs: $security_mirror
+Suites: ${codename}-security
+Components: $components
+Signed-By: $signed_by
+EOF
+        fi
+    else
+        if [[ -f /etc/apt/sources.list ]] && grep -q "mirrors.tuna.tsinghua.edu.cn" /etc/apt/sources.list 2>/dev/null; then
+            success "apt mirror already configured: /etc/apt/sources.list"
+            return 0
+        fi
+        if [[ -f /etc/apt/sources.list ]]; then
+            run_cmd sudo cp /etc/apt/sources.list "/etc/apt/sources.list.bak.$timestamp"
+        fi
+        if $DRY_RUN; then
+            echo -e "${YELLOW}[DRY-RUN]${NC} write TUNA apt sources to /etc/apt/sources.list"
+        else
+            sudo tee /etc/apt/sources.list >/dev/null <<EOF
+deb $mirror $codename $components
+deb $mirror ${codename}-updates $components
+deb $mirror ${codename}-backports $components
+deb $security_mirror ${codename}-security $components
+EOF
+        fi
+    fi
+
+    success "apt mirror configured"
+}
+
 # ─── Step 1: Package Manager ────────────────────────────────────────
 echo ""
 echo -e "${BOLD}══════════════════════════════════════════${NC}"
-echo -e "${BOLD}  📦 Step 1/9: Package Manager${NC}"
+echo -e "${BOLD}  📦 Step 1/10: Package Manager${NC}"
 echo -e "${BOLD}══════════════════════════════════════════${NC}"
 
 case "$OS" in
@@ -214,6 +313,7 @@ case "$OS" in
         fi
         ;;
     debian|wsl)
+        configure_apt_tuna_mirror
         info "Updating apt package index..."
         run_cmd sudo apt-get update
         # Ensure basic build tools are available
@@ -229,7 +329,7 @@ esac
 # ─── Step 2: Terminal Emulator ───────────────────────────────────────
 echo ""
 echo -e "${BOLD}══════════════════════════════════════════${NC}"
-echo -e "${BOLD}  👻 Step 2/9: Terminal Emulator${NC}"
+echo -e "${BOLD}  👻 Step 2/10: Terminal Emulator${NC}"
 echo -e "${BOLD}══════════════════════════════════════════${NC}"
 
 case "$OS" in
@@ -267,7 +367,7 @@ esac
 # ─── Step 3: Nerd Font (MesloLGS NF) ────────────────────────────────
 echo ""
 echo -e "${BOLD}══════════════════════════════════════════${NC}"
-echo -e "${BOLD}  🔤 Step 3/9: Nerd Font (MesloLGS NF)${NC}"
+echo -e "${BOLD}  🔤 Step 3/10: Nerd Font (MesloLGS NF)${NC}"
 echo -e "${BOLD}══════════════════════════════════════════${NC}"
 
 # Determine font directory based on OS
@@ -321,9 +421,9 @@ fi
 echo ""
 echo -e "${BOLD}══════════════════════════════════════════${NC}"
 if [[ "$SHELL_CHOICE" == "fish" ]]; then
-    echo -e "${BOLD}  🐟 Step 4/9: Fish Shell${NC}"
+    echo -e "${BOLD}  🐟 Step 4/10: Fish Shell${NC}"
 else
-    echo -e "${BOLD}  🐚 Step 4/9: Zsh + Fish-like Plugins${NC}"
+    echo -e "${BOLD}  🐚 Step 4/10: Zsh + Fish-like Plugins${NC}"
 fi
 echo -e "${BOLD}══════════════════════════════════════════${NC}"
 
@@ -464,11 +564,11 @@ esac
 # ─── Step 5: CLI Tools ──────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}══════════════════════════════════════════${NC}"
-echo -e "${BOLD}  🛠  Step 5/9: CLI Tools${NC}"
+echo -e "${BOLD}  🛠  Step 5/10: CLI Tools${NC}"
 echo -e "${BOLD}══════════════════════════════════════════${NC}"
 
 install_cli_tools_macos() {
-    local TOOLS=(bat eza fd ripgrep btop zoxide jq tldr git-delta lazygit fzf)
+    local TOOLS=(bat eza fd ripgrep btop zoxide jq tldr git-delta lazygit fzf aria2)
     for tool in "${TOOLS[@]}"; do
         if brew list "$tool" &>/dev/null; then
             success "$tool already installed"
@@ -482,7 +582,7 @@ install_cli_tools_macos() {
 
 install_cli_tools_linux() {
     # Tools available directly from apt (on modern Debian/Ubuntu)
-    local APT_TOOLS=(bat fd-find ripgrep jq fzf)
+    local APT_TOOLS=(bat fd-find ripgrep jq fzf aria2)
 
     for tool in "${APT_TOOLS[@]}"; do
         if dpkg -s "$tool" &>/dev/null 2>&1; then
@@ -613,10 +713,310 @@ case "$OS" in
     debian|wsl) install_cli_tools_linux ;;
 esac
 
-# ─── Step 6: Starship Prompt ────────────────────────────────────────
+install_ffmpeg() {
+    if has_cmd ffmpeg; then
+        success "ffmpeg already installed"
+        return 0
+    fi
+
+    echo ""
+    echo -e "  ffmpeg is useful for audio/video conversion, probing, and frame extraction."
+    printf "  Install ffmpeg? (y/N): "
+    read -r INSTALL_FFMPEG
+    if [[ "$INSTALL_FFMPEG" =~ ^[Yy]$ ]]; then
+        info "Installing ffmpeg..."
+        case "$OS" in
+            macos)
+                run_cmd brew install ffmpeg
+                ;;
+            debian|wsl)
+                run_cmd sudo apt-get install -y ffmpeg
+                ;;
+        esac
+        success "ffmpeg installed"
+    else
+        info "Skipping ffmpeg"
+    fi
+}
+
+install_ffmpeg
+
+# ─── Step 6: Deep Learning Dev Tools ────────────────────────────────
 echo ""
 echo -e "${BOLD}══════════════════════════════════════════${NC}"
-echo -e "${BOLD}  🚀 Step 6/9: Starship Prompt${NC}"
+echo -e "${BOLD}  🧠 Step 6/10: Deep Learning Dev Tools${NC}"
+echo -e "${BOLD}══════════════════════════════════════════${NC}"
+
+install_dev_tools_macos() {
+    local TOOLS=(uv python pipx direnv)
+    for tool in "${TOOLS[@]}"; do
+        if brew list "$tool" &>/dev/null; then
+            success "$tool already installed"
+        else
+            info "Installing $tool..."
+            run_cmd brew install "$tool"
+            success "$tool installed"
+        fi
+    done
+
+    if brew info nvtop &>/dev/null; then
+        if brew list nvtop &>/dev/null; then
+            success "nvtop already installed"
+        else
+            info "Installing nvtop..."
+            run_cmd brew install nvtop
+            success "nvtop installed"
+        fi
+    else
+        warn "nvtop is not available via Homebrew on this system — skipping"
+    fi
+}
+
+install_dev_tools_linux() {
+    local APT_TOOLS=(python3 python3-venv python3-pip pipx direnv)
+    for tool in "${APT_TOOLS[@]}"; do
+        if dpkg -s "$tool" &>/dev/null 2>&1; then
+            success "$tool already installed"
+        else
+            info "Installing $tool..."
+            run_cmd sudo apt-get install -y "$tool"
+            success "$tool installed"
+        fi
+    done
+
+    if has_cmd uv; then
+        success "uv already installed"
+    else
+        info "Installing uv..."
+        if $DRY_RUN; then
+            echo -e "${YELLOW}[DRY-RUN]${NC} curl -LsSf https://astral.sh/uv/install.sh | sh"
+        else
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            export PATH="$HOME/.local/bin:$PATH"
+        fi
+        success "uv installed"
+    fi
+
+    if has_cmd nvtop; then
+        success "nvtop already installed"
+    else
+        info "Installing nvtop..."
+        if run_cmd sudo apt-get install -y nvtop 2>/dev/null; then
+            success "nvtop installed"
+        else
+            warn "nvtop is not available via apt on this Ubuntu/Debian release — skipping"
+        fi
+    fi
+}
+
+case "$OS" in
+    macos)      install_dev_tools_macos ;;
+    debian|wsl) install_dev_tools_linux ;;
+esac
+
+configure_python_package_mirrors() {
+    echo ""
+    echo -e "  Use China mirrors for pip, uv, and conda?"
+    echo -e "  PyPI mirror:  ${BOLD}https://mirrors.tuna.tsinghua.edu.cn${NC}"
+    echo -e "  Conda mirror: ${BOLD}https://mirrors.ustc.edu.cn${NC}"
+    printf "  Configure Python/Conda mirrors? (y/N): "
+    read -r CONFIGURE_PYTHON_MIRRORS
+    if [[ ! "$CONFIGURE_PYTHON_MIRRORS" =~ ^[Yy]$ ]]; then
+        info "Keeping existing Python/Conda mirror settings"
+        return 0
+    fi
+
+    local timestamp
+    timestamp="$(date +%s)"
+
+    deploy_user_config() {
+        local src="$1"
+        local dest="$2"
+        local dest_dir
+        dest_dir="$(dirname "$dest")"
+
+        if $DRY_RUN; then
+            echo -e "${YELLOW}[DRY-RUN]${NC} mkdir -p $dest_dir"
+            if [[ -f "$dest" ]]; then
+                echo -e "${YELLOW}[DRY-RUN]${NC} cp $dest $dest.bak.$timestamp"
+            fi
+            echo -e "${YELLOW}[DRY-RUN]${NC} cp $src $dest"
+            return 0
+        fi
+
+        mkdir -p "$dest_dir"
+        if [[ -f "$dest" ]]; then
+            cp "$dest" "$dest.bak.$timestamp"
+            warn "Backed up existing $dest"
+        fi
+        cp "$src" "$dest"
+    }
+
+    deploy_user_config "$CONFIGS_DIR/pip.conf" "$HOME/.config/pip/pip.conf"
+    deploy_user_config "$CONFIGS_DIR/uv.toml" "$HOME/.config/uv/uv.toml"
+    deploy_user_config "$CONFIGS_DIR/.condarc" "$HOME/.condarc"
+    success "Mirrors configured for pip, uv, and conda"
+}
+
+configure_python_package_mirrors
+
+install_miniforge() {
+    if has_cmd conda || [[ -x "$HOME/miniforge3/bin/conda" ]]; then
+        success "Miniforge/conda already installed"
+        if [[ -x "$HOME/miniforge3/bin/conda" ]]; then
+            run_cmd "$HOME/miniforge3/bin/conda" config --set auto_activate_base false
+        fi
+        return 0
+    fi
+
+    echo ""
+    echo -e "  Miniforge provides conda/mamba environments for scientific Python and ML."
+    echo -e "  It will be installed to ${BOLD}$HOME/miniforge3${NC} with base auto-activation disabled."
+    printf "  Install Miniforge? (y/N): "
+    read -r INSTALL_MINIFORGE
+    if [[ ! "$INSTALL_MINIFORGE" =~ ^[Yy]$ ]]; then
+        info "Skipping Miniforge"
+        return 0
+    fi
+
+    local miniforge_arch
+    miniforge_arch="$(uname -m)"
+    case "$miniforge_arch" in
+        x86_64|aarch64|arm64) ;;
+        *)
+            warn "Unsupported architecture for Miniforge: $miniforge_arch"
+            return 0
+            ;;
+    esac
+
+    local miniforge_os
+    case "$OS" in
+        macos) miniforge_os="MacOSX" ;;
+        debian|wsl) miniforge_os="Linux" ;;
+        *) warn "Unsupported OS for Miniforge: $OS"; return 0 ;;
+    esac
+
+    local installer="Miniforge3-${miniforge_os}-${miniforge_arch}.sh"
+    local url="https://github.com/conda-forge/miniforge/releases/latest/download/$installer"
+    local tmp_dir=""
+    tmp_dir="$(mktemp -d)"
+
+    info "Installing Miniforge..."
+    if $DRY_RUN; then
+        echo -e "${YELLOW}[DRY-RUN]${NC} curl -fL --progress-bar $url -o $tmp_dir/$installer"
+        echo -e "${YELLOW}[DRY-RUN]${NC} bash $tmp_dir/$installer -b -p $HOME/miniforge3"
+        echo -e "${YELLOW}[DRY-RUN]${NC} $HOME/miniforge3/bin/conda config --set auto_activate_base false"
+    else
+        curl -fL --progress-bar "$url" -o "$tmp_dir/$installer"
+        bash "$tmp_dir/$installer" -b -p "$HOME/miniforge3"
+        "$HOME/miniforge3/bin/conda" config --set auto_activate_base false
+        rm -rf "$tmp_dir"
+    fi
+    success "Miniforge installed with base auto-activation disabled"
+}
+
+install_miniforge
+
+configure_miniforge_shell() {
+    local conda_bin=""
+    local mamba_bin=""
+
+    if [[ -x "$HOME/miniforge3/bin/conda" ]]; then
+        conda_bin="$HOME/miniforge3/bin/conda"
+    elif has_cmd conda; then
+        conda_bin="$(command -v conda)"
+    else
+        return 0
+    fi
+
+    info "Configuring conda for $SHELL_CHOICE..."
+    if $DRY_RUN; then
+        echo -e "${YELLOW}[DRY-RUN]${NC} $conda_bin init $SHELL_CHOICE"
+    else
+        "$conda_bin" init "$SHELL_CHOICE"
+    fi
+    success "Conda shell integration configured"
+
+    if [[ -x "$HOME/miniforge3/bin/mamba" ]]; then
+        mamba_bin="$HOME/miniforge3/bin/mamba"
+    elif has_cmd mamba; then
+        mamba_bin="$(command -v mamba)"
+    else
+        return 0
+    fi
+
+    info "Configuring mamba activate/deactivate for $SHELL_CHOICE..."
+    if [[ "$SHELL_CHOICE" == "zsh" ]]; then
+        if grep -qF 'mamba shell hook --shell zsh' "$HOME/.zshrc" 2>/dev/null; then
+            success "Mamba shell integration already present"
+            return 0
+        fi
+        if $DRY_RUN; then
+            echo -e "${YELLOW}[DRY-RUN]${NC} append mamba shell hook to $HOME/.zshrc"
+        else
+            cat >> "$HOME/.zshrc" << MAMBAZSH
+
+# >>> mamba initialize >>>
+eval "\$($mamba_bin shell hook --shell zsh --root-prefix "$HOME/miniforge3")"
+# <<< mamba initialize <<<
+MAMBAZSH
+        fi
+        success "Mamba shell integration configured"
+    elif [[ "$SHELL_CHOICE" == "fish" ]]; then
+        local fish_config="$HOME/.config/fish/config.fish"
+        if grep -qF 'mamba shell hook --shell fish' "$fish_config" 2>/dev/null; then
+            success "Mamba shell integration already present"
+            return 0
+        fi
+        if $DRY_RUN; then
+            echo -e "${YELLOW}[DRY-RUN]${NC} append mamba shell hook to $fish_config"
+        else
+            cat >> "$fish_config" << MAMBAFISH
+
+# >>> mamba initialize >>>
+$mamba_bin shell hook --shell fish --root-prefix "$HOME/miniforge3" | source
+# <<< mamba initialize <<<
+MAMBAFISH
+        fi
+        success "Mamba shell integration configured"
+    fi
+}
+
+# Optional Hugging Face downloader (community script)
+install_hfd() {
+    if has_cmd hfd; then
+        success "hfd already installed"
+        return 0
+    fi
+
+    echo ""
+    echo -e "  hfd is a community Hugging Face downloader based on aria2/wget."
+    echo -e "  Source: ${BOLD}https://gist.github.com/padeoe/697678ab8e528b85a2a7bddafea1fa4f${NC}"
+    printf "  Install hfd Hugging Face downloader? (y/N): "
+    read -r INSTALL_HFD
+    if [[ "$INSTALL_HFD" =~ ^[Yy]$ ]]; then
+        info "Installing hfd..."
+        mkdir -p "$HOME/.local/bin"
+        if $DRY_RUN; then
+            echo -e "${YELLOW}[DRY-RUN]${NC} curl -fsSL https://gist.githubusercontent.com/padeoe/697678ab8e528b85a2a7bddafea1fa4f/raw/hfd.sh -o $HOME/.local/bin/hfd"
+            echo -e "${YELLOW}[DRY-RUN]${NC} chmod +x $HOME/.local/bin/hfd"
+        else
+            curl -fsSL "https://gist.githubusercontent.com/padeoe/697678ab8e528b85a2a7bddafea1fa4f/raw/hfd.sh" -o "$HOME/.local/bin/hfd"
+            chmod +x "$HOME/.local/bin/hfd"
+            export PATH="$HOME/.local/bin:$PATH"
+        fi
+        success "hfd installed"
+    else
+        info "Skipping hfd"
+    fi
+}
+
+install_hfd
+
+# ─── Step 7: Starship Prompt ────────────────────────────────────────
+echo ""
+echo -e "${BOLD}══════════════════════════════════════════${NC}"
+echo -e "${BOLD}  🚀 Step 7/10: Starship Prompt${NC}"
 echo -e "${BOLD}══════════════════════════════════════════${NC}"
 
 if has_cmd starship; then
@@ -636,13 +1036,13 @@ else
             else
                 # Download from GitHub releases (starship.rs installer may fail on some WSL setups)
                 info "Bundled binary not found, downloading from GitHub..."
-                local starship_arch
+                starship_arch=""
                 case "$(uname -m)" in
                     x86_64)  starship_arch="x86_64" ;;
                     aarch64) starship_arch="aarch64" ;;
                     *) error "Unsupported arch for Starship: $(uname -m)" ;;
                 esac
-                local starship_tmp
+                starship_tmp=""
                 starship_tmp="$(mktemp -d)"
                 if $DRY_RUN; then
                     echo -e "${YELLOW}[DRY-RUN]${NC} Download starship from GitHub releases"
@@ -659,10 +1059,10 @@ else
     success "Starship installed"
 fi
 
-# ─── Step 7: fnm + Node.js (optional) ───────────────────────────────
+# ─── Step 8: fnm + Node.js (optional) ───────────────────────────────
 echo ""
 echo -e "${BOLD}══════════════════════════════════════════${NC}"
-echo -e "${BOLD}  🟢 Step 7/9: fnm + Node.js (optional)${NC}"
+echo -e "${BOLD}  🟢 Step 8/10: fnm + Node.js (optional)${NC}"
 echo -e "${BOLD}══════════════════════════════════════════${NC}"
 
 if has_cmd fnm; then
@@ -716,10 +1116,33 @@ else
     fi
 fi
 
-# ─── Step 8: Zellij (optional) ──────────────────────────────────────
+# ─── pnpm (default when Node is available) ───────────────────────────
+install_pnpm() {
+    if has_cmd pnpm; then
+        success "pnpm already installed"
+        return 0
+    fi
+
+    if has_cmd corepack; then
+        info "Installing pnpm via Corepack..."
+        run_cmd corepack enable
+        run_cmd corepack prepare pnpm@latest --activate
+        success "pnpm installed"
+    elif has_cmd npm; then
+        info "Installing pnpm via npm..."
+        run_cmd npm install -g pnpm
+        success "pnpm installed"
+    else
+        warn "Node/npm not found — skipping pnpm"
+    fi
+}
+
+install_pnpm
+
+# ─── Step 9: Zellij (optional) ──────────────────────────────────────
 echo ""
 echo -e "${BOLD}══════════════════════════════════════════${NC}"
-echo -e "${BOLD}  🪟 Step 8/9: Zellij (optional)${NC}"
+echo -e "${BOLD}  🪟 Step 9/10: Zellij (optional)${NC}"
 echo -e "${BOLD}══════════════════════════════════════════${NC}"
 
 if has_cmd zellij; then
@@ -743,14 +1166,14 @@ else
                 else
                     # Download binary from GitHub releases (zellij.dev/launch auto-starts zellij, which hangs the script)
                     info "Downloading Zellij from GitHub releases..."
-                    local zellij_arch
+                    zellij_arch=""
                     case "$(uname -m)" in
                         x86_64)  zellij_arch="x86_64" ;;
                         aarch64) zellij_arch="aarch64" ;;
                         *) warn "Unsupported arch for Zellij: $(uname -m)"; return 0 ;;
                     esac
-                    local zellij_url="https://github.com/zellij-org/zellij/releases/latest/download/zellij-${zellij_arch}-unknown-linux-musl.tar.gz"
-                    local zellij_tmp
+                    zellij_url="https://github.com/zellij-org/zellij/releases/latest/download/zellij-${zellij_arch}-unknown-linux-musl.tar.gz"
+                    zellij_tmp=""
                     zellij_tmp="$(mktemp -d)"
                     if $DRY_RUN; then
                         echo -e "${YELLOW}[DRY-RUN]${NC} curl -fsSL $zellij_url | tar xz -C $zellij_tmp && sudo cp $zellij_tmp/zellij /usr/local/bin/"
@@ -769,10 +1192,10 @@ else
     fi
 fi
 
-# ─── Step 9: Config Files ───────────────────────────────────────────
+# ─── Step 10: Config Files ──────────────────────────────────────────
 echo ""
 echo -e "${BOLD}══════════════════════════════════════════${NC}"
-echo -e "${BOLD}  📦 Step 9/9: Deploying Configs${NC}"
+echo -e "${BOLD}  📦 Step 10/10: Deploying Configs${NC}"
 echo -e "${BOLD}══════════════════════════════════════════${NC}"
 
 # --- Ghostty config ---
@@ -915,7 +1338,8 @@ else
         run_cmd cp "$CONFIGS_DIR/.zshrc" "$HOME/.zshrc"
 
         # Patch Homebrew paths → Linux paths
-        sed -i 's|export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:\$PATH"|# PATH — system paths on Linux\nexport PATH="$HOME/.local/bin:$PATH"|' "$HOME/.zshrc"
+        sed -i '/# ─── Homebrew/i # ─── Local bin (Linux) ───────────────────────────────────────────────\nexport PATH="$HOME/.local/bin:$PATH"\n' "$HOME/.zshrc"
+        sed -i '/export PATH="\/opt\/homebrew\/bin:\/opt\/homebrew\/sbin:\$PATH"/d' "$HOME/.zshrc"
 
         # Patch zsh plugin source paths
         sed -i 's|/opt/homebrew/share/zsh-syntax-highlighting/|/usr/share/zsh-syntax-highlighting/|g' "$HOME/.zshrc"
@@ -932,6 +1356,8 @@ else
     fi
     success "Zsh config deployed"
 fi
+
+configure_miniforge_shell
 
 # ─── Git config for delta ────────────────────────────────────────────
 if has_cmd delta || $DRY_RUN; then
@@ -980,14 +1406,25 @@ else
 fi
 echo -e "    🚀 Starship             — prompt (Catppuccin Mocha)"
 echo -e "    🔤 MesloLGS NF          — nerd font"
-echo -e "    🟢 fnm                  — Node version manager (fast!)"
+echo -e "    🟢 fnm + pnpm           — Node version/package managers"
 echo -e "    📦 bat eza fd rg        — modern coreutils"
 echo -e "    📊 btop                 — system monitor"
 echo -e "    🔀 lazygit + delta      — git tools"
 echo -e "    📁 zoxide               — smart cd"
 echo -e "    🔍 fzf                  — fuzzy finder"
+echo -e "    📥 aria2                — fast downloads"
+if has_cmd ffmpeg; then
+    echo -e "    🎞  ffmpeg              — media processing"
+fi
+echo -e "    🧠 uv pipx direnv nvtop — Python/ML dev helpers"
+if has_cmd conda || [[ -x "$HOME/miniforge3/bin/conda" ]]; then
+    echo -e "    🐍 Miniforge            — conda/mamba environments"
+fi
 if has_cmd zellij; then
     echo -e "    🪟 zellij               — terminal multiplexer"
+fi
+if has_cmd hfd; then
+    echo -e "    🤗 hfd                  — Hugging Face downloader"
 fi
 echo ""
 echo -e "  ${YELLOW}Next steps:${NC}"

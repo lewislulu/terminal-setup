@@ -74,6 +74,11 @@ fi
 # ─── Zoxide (smart cd) ──────────────────────────────────────────────
 eval "$(zoxide init zsh)"
 
+# ─── direnv (per-project env) ───────────────────────────────────────
+if command -v direnv &>/dev/null; then
+    eval "$(direnv hook zsh)"
+fi
+
 # ─── fnm (Node version manager) ─────────────────────────────────────
 if command -v fnm &>/dev/null; then
     eval "$(fnm env --use-on-cd --shell zsh)"

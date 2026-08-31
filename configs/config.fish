@@ -19,6 +19,11 @@ if command -q fnm
     fnm env --use-on-cd --shell fish | source
 end
 
+# direnv (per-project env)
+if command -q direnv
+    direnv hook fish | source
+end
+
 # SSH key switcher (fallback for multi-account setups)
 # Usage: set-ssh-key lewis-official-20260224
 # Prefer ~/.ssh/config Host aliases for automatic matching.

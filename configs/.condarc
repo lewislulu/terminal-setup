@@ -1,0 +1,12 @@
+channels:
+  - conda-forge
+
+show_channel_urls: true
+channel_priority: strict
+
+mirrored_channels:
+  conda-forge:
+    - https://mirrors.ustc.edu.cn/anaconda/cloud/conda-forge
+
+auto_activate: false
+changeps1: false
